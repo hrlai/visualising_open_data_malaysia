@@ -5,7 +5,7 @@ output: github_document
 
 Visualisation exercise using the dataset ![Milk feeding practices among children aged below 2 years old](http://www.data.gov.my/data/ms_MY/dataset/milk-feeding-practices-among-children-aged-below-2-years-old-nhms-2016) published by the Ministry of Health Malaysia.
 
-```{r packages, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+```{r packages, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(ggthemes)
@@ -28,7 +28,7 @@ p <-
   scale_fill_few() + 
   scale_x_continuous(labels = scales::percent) +
   labs(y = "", x = "Prevalence", 
-       title = "Milk feeding practices among children aged below 2 years old",
+       title = "Milk feeding practices among children 0 - 23 months",
        caption = "Data from Ministry of Health Malaysia\nNational Health and Morbidity Survey (Maternal and Child Health) 2016") +
   theme_fivethirtyeight() +
   theme(legend.position = "bottom",
@@ -36,7 +36,7 @@ p <-
         axis.title.y = element_blank(),
         panel.grid.major.y = element_blank(),
         plot.caption = element_text(face = "italic", size = 8),
-        plot.title = element_text(hjust = 1.27, vjust = 4, size = 12))
+        plot.title = element_text(hjust = 1.75, vjust = 4, size = 12))
 
 p
 
