@@ -1,0 +1,86 @@
+---
+title: "Demography census 1970 - 2010"
+output: github_document
+---
+
+
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(gganimate)
+library(ggthemes)
+library(scales)
+```
+
+
+```{r wrangling, include=FALSE}
+filenames <- list.files("data", full.names = TRUE)
+census <- 
+  lapply(filenames, function(x) {
+    read_csv(x)
+  }) %>% 
+  do.call(rbind, .) %>% 
+  # group everone >=70 yo as one group
+  mutate(`Age Group` = str_replace(`Age Group`, "\\+", "")) %>% 
+  separate(`Age Group`, c("Age_min", "Age_max"), sep = " - ") %>% 
+  mutate_at(vars(starts_with("Age")), as.numeric) %>% 
+  mutate(Age_min = ifelse(Age_min < 70, Age_min, 70)) %>% 
+  group_by(Year, Age_min) %>% 
+  summarise_at(vars(contains("000")), ~sum(.) * 1000) %>% 
+  mutate(Age_Grp = ifelse(Age_min < 70,
+                          paste(Age_min, lead(Age_min)-1, sep = "-"),
+                          paste0(Age_min, "+"))) %>% 
+  select(Year, 
+         starts_with("Age"), 
+         Male = `Male ('000)`,
+         Female = `Female ('000)`) %>% 
+  # add negative sign to Male for plotting
+  mutate(Male = - Male) %>% 
+  # relevel age group
+  ungroup %>% 
+  mutate(Age_Grp = fct_reorder(Age_Grp, Age_min)) %>% 
+  pivot_longer(cols = Male:Female,
+               names_to = "Gender",
+               values_to = "Count") %>% 
+  mutate(Gender = fct_relevel(Gender, "Male", "Female")) %>% 
+  filter(!is.na(Year))
+
+```
+
+ 
+```{r echo=FALSE, fig.height=4, fig.width=3}
+p <- 
+  ggplot(census) +
+  geom_bar(aes(Age_Grp, Count, fill = Gender),
+           stat = "identity", 
+           width = 1, alpha = 0.8) +
+  coord_flip(expand = FALSE, ylim = c(-1500000, 1500000)) +
+  scale_fill_hc() +
+  # scale_y_continuous(labels = trans_format("abs", unit_format(
+  #                      unit = "k", sep = "", scale = 1e-3))) + 
+  scale_y_continuous(breaks = c(-1e6, 0, 1e6),
+                     labels = c("1 million", 0, "1 million")) +
+  theme_hc() +
+  theme(axis.title.x = element_blank(),
+        legend.title = element_blank(),
+        plot.caption = element_text(size = 7, face = "italic"),
+        plot.title = element_text(size = 12)) +
+  # animation
+  labs(title = 'Year: {round(frame_time)}', 
+       x = "Age group",
+       caption = "Data source: Intercensal Mid-Year Population Estimates by\nAge Group and Sex, Malaysia, 1970-2010\nDepartment of Statistics Malaysia") +
+  transition_time(Year)
+
+animate(
+  p,
+  renderer = gifski_renderer(loop = TRUE),
+  nframes = 96,
+  fps = 24,
+  rewind = TRUE,
+  end_pause = 10,
+  height = 5, width = 4, unit = "in", res = 300
+)
+anim_save("figs/malaysia_demography_1970_2010.gif")
+```
+ 
+ 
