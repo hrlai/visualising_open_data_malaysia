@@ -1,0 +1,42 @@
+---
+title: "Night market locations in Kuala Lumpur"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(tmaptools)
+library(osmdata)
+library(ggmap)
+```
+
+
+```{r}
+pasar <- 
+  read_excel("data/jppp-lokasi-pasar-malam-2019.xlsx", 
+             skip = 2) %>% 
+  mutate_all(~str_replace(., "  ", " ")) %>% 
+  mutate(LOKASI = str_remove(LOKASI, "PASAR MALAM ")) %>% 
+  # some manual string removals
+  mutate(LOKASI = str_remove(LOKASI, " \\(BUKIT CHERAS\\)")) %>% 
+  # paste Kuala Lumpur for better map searching
+  mutate(keyword = paste0(LOKASI, ", Kuala Lumpur"))
+
+coord <- 
+  geocode_OSM(pasar$keyword, as.sf = TRUE, geometry = "point")
+```
+
+
+
+```{r}
+kl_map <-
+  get_stamenmap(getbb("Kuala Lumpur"), 
+                maptype = "toner-lite",
+                zoom = 12,
+                scale = 1)
+
+ggmap(kl_map) +
+  geom_sf(data = coord)
+```
+
