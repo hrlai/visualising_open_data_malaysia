@@ -1,0 +1,34 @@
+---
+title: "Dengue"
+output: github_document
+---
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(aweek)
+```
+
+
+```{r}
+dengue <- 
+  read_csv("data/dengue_clean.csv") %>% 
+  pivot_longer(cols = starts_with("Minggu"),
+               names_to = "Week",
+               values_to = "Cases",
+               names_prefix = "Minggu ") %>% 
+  mutate(Date = get_date(Week, year = Year),
+         Month = month(Date),
+         Day = yday(Date))
+```
+
+```{r}
+ggplot(dengue) +
+  # geom_line(aes(Day, Cases, group = Year, colour = Year)) +
+  geom_line(aes(Date, Cases, group = Year, colour = Year)) +
+  # coord_polar() +
+  scale_colour_viridis_b() +
+  theme_minimal()
+```
+
