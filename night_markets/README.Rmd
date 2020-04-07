@@ -3,16 +3,26 @@ title: "Night market locations in Kuala Lumpur"
 output: github_document
 ---
 
-```{r}
+```{r include=FALSE}
 library(tidyverse)
 library(readxl)
+library(tmap)
 library(tmaptools)
 library(osmdata)
 library(ggmap)
+library(sf)
+library(gganimate)
+library(extrafont)
 ```
 
 
-```{r}
+```{r NOT RUN unless update, eval=FALSE, include=FALSE}
+day.names <- 
+  data.frame(
+    Malay = c("ISNIN", "SELASA", "RABU", "KHAMIS", "JUMAAT", "SABTU", "AHAD"),
+    English = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+  )
+
 pasar <- 
   read_excel("data/jppp-lokasi-pasar-malam-2019.xlsx", 
              skip = 2) %>% 
@@ -21,22 +31,73 @@ pasar <-
   # some manual string removals
   mutate(LOKASI = str_remove(LOKASI, " \\(BUKIT CHERAS\\)")) %>% 
   # paste Kuala Lumpur for better map searching
-  mutate(keyword = paste0(LOKASI, ", Kuala Lumpur"))
+  mutate(keyword = paste0(LOKASI, ", Kuala Lumpur")) %>% 
+  # convert operation day to long format
+  separate(`HARI BEROPERASI`, c("Day_1", "Day_2"), sep = " \\& ") %>% 
+  separate(`BIL UNIT`, c("Unit_1", "Unit_2"), sep = " \\& ") %>% 
+  pivot_longer(cols = contains("_"),
+               names_to = c(".value", "set"),
+               names_sep = "_") %>% 
+  filter(!is.na(Day)) %>% 
+  fill(Unit) %>% 
+  mutate(Unit = as.numeric(Unit)) %>% 
+  left_join(day.names, by = c("Day"="Malay")) %>% 
+  mutate(Day = fct_relevel(English, c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))) %>% 
+  select(-English)
 
 coord <- 
-  geocode_OSM(pasar$keyword, as.sf = TRUE, geometry = "point")
+  geocode_OSM(unique(pasar$keyword), as.sf = TRUE, geometry = "point")
+
+saveRDS(pasar, "data/pasar_malam_clean.rds")
+saveRDS(coord, "data/coord_clean.rds")
 ```
 
 
 
-```{r}
+```{r echo=FALSE, fig.height=5, fig.width=3.38, message=FALSE, warning=FALSE}
+pasar <- readRDS("data/pasar_malam_clean.rds")
+coord <- readRDS("data/coord_clean.rds")
+coord <- 
+  left_join(coord, pasar, by = c("query"="keyword"))
+
+kl_poly <- getbb("Kuala Lumpur", format_out = "sf_polygon")
+
 kl_map <-
   get_stamenmap(getbb("Kuala Lumpur"), 
-                maptype = "toner-lite",
-                zoom = 12,
+                maptype = "watercolor",
+                zoom = 13,
                 scale = 1)
 
-ggmap(kl_map) +
-  geom_sf(data = coord)
+pasar_anim <- 
+  ggmap(kl_map, extent = "device") +
+  geom_sf(data = coord, 
+          # aes(size = Unit, group = Day),
+          aes(group = LOKASI), size = 10,
+          pch = 21, fill = "red", alpha = 0.6,
+          inherit.aes = FALSE) +
+  geom_sf(data = kl_poly, 
+          fill = NA, size = 1,
+          inherit.aes = FALSE) +
+  theme_void() +
+  theme(plot.title = element_text(size = 11, face = "bold"),
+        plot.caption = element_text(size = 7, face = "italic"),
+        text = element_text(family = "CMU Sans Serif")) +
+  # animation
+  labs(title = "Pasar malam in Kuala Lumpur on {closest_state}",
+       caption = "Data from Senarai Lokasi Pasar Malam DBKL (2019)") +
+  transition_states(Day, 
+                    transition_length = 1, 
+                    state_length = 1) +
+  enter_grow() +
+  exit_shrink() +
+  ease_aes()
+
+
+animate(
+  pasar_anim,
+  renderer = gifski_renderer(loop = TRUE),
+  height = 5, width = 3.5, unit = "in", res = 150
+)
+anim_save("figs/pasar_malam_2019.gif")
 ```
 
