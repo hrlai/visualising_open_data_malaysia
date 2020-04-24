@@ -1,0 +1,133 @@
+---
+title: "Google Mobility Report for COVID-19"
+output: github_document
+---
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(extrafont)
+```
+
+
+
+```{r include=FALSE}
+mob <- 
+  read_csv("data/Global_Mobility_Report.csv",
+           col_types = "ccccDdddddd") %>% 
+  pivot_longer(cols = contains("from_baseline"),
+               names_to = "Place",
+               values_to = "Change") %>% 
+  mutate(Place = str_remove(Place, "_percent_change_from_baseline")) %>% 
+  group_by(country_region_code, country_region, date, Place) %>% 
+  summarise(Change = median(Change, na.rm = TRUE))
+
+mob_my <-
+  mob %>% 
+  filter(country_region_code == "MY") %>% 
+  mutate(Place_group = ifelse(Place == "residential", 
+                              "residential",
+                              "non-residential")) %>% 
+  group_by(country_region_code, country_region, date, Place_group) %>% 
+  summarise(Change = median(Change, na.rm = TRUE)) %>% 
+  pivot_wider(names_from = Place_group,
+              values_from = Change)
+```
+
+
+
+```{r include=FALSE}
+ggplot(mob %>% filter(country_region_code == "MY")) +
+  facet_wrap(~ Place) +
+  geom_line(aes(date, Change,
+                group = country_region))
+```
+
+
+```{r phase diagram, echo=FALSE}
+ggplot(mob_my, aes(residential + runif(nrow(mob_my), 0, 0.5), 
+                   `non-residential` + runif(nrow(mob_my), 0, 0.5))) +
+  geom_path() +
+  geom_point(pch = 1, size = 2)
+```
+
+
+```{r echo=FALSE, fig.height=4, fig.width=6}
+workplaces_my <- 
+  mob %>% 
+  filter(country_region_code == "MY",
+         Place == "workplaces") %>% 
+  mutate(Weekday = wday(date),
+         Weekend = Weekday %in% c(6, 7))
+
+weekend_rect <- 
+  workplaces_my %>% 
+  ungroup %>% 
+  filter(Weekend == TRUE) %>% 
+  select(date, Weekday) %>% 
+  mutate(Week = week(date)) %>% 
+  pivot_wider(names_from = Weekday,
+              values_from = date) %>% 
+  filter(!is.na(`6`),
+         !is.na(`7`))
+
+workplaces_my_plot <- 
+  ggplot() +
+  geom_rect(data = weekend_rect,
+            aes(xmin = `6`, xmax = `7`+1,
+                ymin = -100, ymax = 100),
+            alpha = 0.2) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  # geom_line(data = workplaces_my, aes(date, Change)) + 
+  # geom_col(data = workplaces_my, aes(date, Change)) + 
+  geom_step(data = workplaces_my, aes(date, Change)) + 
+  # geom_vline(xintercept = ymd("2020-02-21")) +
+  annotate("text", 
+           x = ymd("2020-03-18"),
+           y = workplaces_my$Change[workplaces_my$date=="2020-03-18"],
+           label = "MCO",
+           angle = 45, hjust = 1.1,
+           fontface = "italic", family = "CMU Sans Serif", size = 3.5) +
+  scale_x_date(breaks = weekend_rect$`6`[c(1,3,5,7)],
+               date_labels = "%d %b") +
+  # scale_x_date(date_minor_breaks = "1 day") +
+  labs(y = "% Change from baseline",
+       title = "Trends in workplace visits during COVID-19 outbreak | Malaysia",
+       subtitle = "On 16 April, Google released a report to 'provide insights into what has changed in response to policies\naimed at combating COVID-19'. Insights in these reports are created with aggregated, anonymied sets\nof data from users who have turned on the Location History setting. The data are the same as what\nGoogle Maps use to show how busy certain types of places are. This figure focuses only the 'workplace'\nplace type. The baseline is the median value, for the corresponding day of the week, during the 5-week\nperiod between Jan 3–Feb 6, 2020. Grey areas are weekends.",
+       caption = "Data from Google's COVID-19 Community Mobility Report.") +
+  coord_cartesian(expand = FALSE, 
+                  ylim = c(-100, 10)) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(face = "bold", size = 11),
+        plot.subtitle = element_text(size = 9),
+        plot.caption = element_text(size = 8, face = "italic"),
+        axis.title.x = element_blank(),
+        text = element_text(family = "CMU Sans Serif"))
+
+ggsave("figs/workplace_my.png",
+       workplaces_my_plot,
+       width = 6.2, height = 4, units = "in",
+       dpi = 300)
+```
+
+
+```{r}
+grocery_my <- 
+  mob %>% 
+  filter(country_region_code == "MY",
+         Place == "grocery_and_pharmacy") %>% 
+  mutate(Weekday = wday(date),
+         Weekend = Weekday %in% c(6, 7))
+
+ggplot() +
+  geom_rect(data = weekend_rect,
+            aes(xmin = `6`, xmax = `7`+1,
+                ymin = -100, ymax = 100),
+            alpha = 0.2) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_step(data = grocery_my, aes(date, Change))
+```
+
