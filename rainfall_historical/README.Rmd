@@ -1,0 +1,32 @@
+---
+title: "Historical rainfall"
+output: github_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(gganimate)
+```
+
+
+```{r}
+rain <- 
+  read_csv("data/pr_1901_2016_MYS.csv") %>% 
+  rename(Rainfall = `Rainfall - (MM)`) %>% 
+  mutate(Date = paste(str_remove(Statistics, " Average"), Year),
+         Date = parse_date(Date, "%b %Y"),
+         Month = month(Date))
+```
+
+
+
+```{r}
+ggplot(rain, aes(Month, Rainfall)) +
+  geom_col(aes(group = Year),
+            alpha = 0.3, width = 1) + 
+  coord_polar() +
+  theme_minimal() +
+  transition_time(Year)
+```
+
